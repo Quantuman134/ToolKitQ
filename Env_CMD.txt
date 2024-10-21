@@ -5,3 +5,4 @@ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.o
 pip install matplotlib
 pip install diffusers["torch"]
 pip install transformers
+pip install datasets
