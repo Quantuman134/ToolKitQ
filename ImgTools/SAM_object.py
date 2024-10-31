@@ -7,6 +7,7 @@ from segment_anything import sam_model_registry, SamPredictor
 from PIL import Image
 from rembg import remove
 import cv2
+from dataclasses import dataclass
 
 def sam_init(device='cpu'):
     sam_checkpoint = os.path.join(os.path.dirname(__file__), "SAM_pth", "sam_vit_h.pth")
@@ -35,10 +36,11 @@ def _sam_segment(predictor, input_image, *bbox_coords):
     out_image_bbox = out_image.copy()
     out_image_bbox[:, :, 3] = masks_bbox[-1].astype(np.uint8) * 255
     torch.cuda.empty_cache()
-    return Image.fromarray(out_image_bbox, mode='RGBA') 
+    return Image.fromarray(out_image_bbox, mode='RGBA'), masks_bbox[-1].astype(np.uint8) * 255
 
 def _expand2square(pil_img, background_color):
     width, height = pil_img.size
+
     if width == height:
         return pil_img
     elif width > height:
@@ -50,12 +52,23 @@ def _expand2square(pil_img, background_color):
         result.paste(pil_img, ((height - width) // 2, 0))
         return result
 
-def segment(predictor, input_image, segment=True, square_output=True, size:tuple=None):
+@dataclass
+class SegmentOutput:
+    image:Image
+    mask:np.ndarray
+    origin_size:tuple # the segment image might be expand and resized
+
+def segment(predictor, input_image, segment=True, square_output=True, size:tuple=None, return_dict=False):
     '''
         input_image: PIL.Image
+        mask: mask of input image (H, W), value range int[0, 255]
+        output: PIL.Image with RGBA channel
     '''
-    RES = 1024
-    input_image.thumbnail([RES, RES], Image.Resampling.LANCZOS)
+    # RES = 1024
+    # input_image.thumbnail([RES, RES], Image.Resampling.LANCZOS)
+    width, height = input_image.size
+    origin_size = (width, height)
+
     if segment:
         image_rem = input_image.convert('RGBA')
         image_nobg = remove(image_rem, alpha_matting=True)
@@ -66,12 +79,16 @@ def segment(predictor, input_image, segment=True, square_output=True, size:tuple
         y_min = int(y_nonzero[0].min())
         x_max = int(x_nonzero[0].max())
         y_max = int(y_nonzero[0].max())
-        input_image = _sam_segment(predictor, input_image.convert('RGB'), x_min, y_min, x_max, y_max)
+        input_image, mask = _sam_segment(predictor, input_image.convert('RGB'), x_min, y_min, x_max, y_max)
     if square_output:
         input_image = _expand2square(input_image, (127, 127, 127, 0))
     if size is not None:
         input_image = input_image.resize(size, Image.Resampling.LANCZOS)
-    return input_image
+    
+    if return_dict:
+        return SegmentOutput(image=input_image, mask=mask, origin_size=origin_size)
+    else:
+        return input_image
 
 if __name__ == '__main__':
     from ToolKitQ.PyTools.PytorchTools import torch_device_config
