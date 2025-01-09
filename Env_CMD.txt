@@ -12,4 +12,4 @@ pip install transformers
 # ImgTools
 pip install git+https://github.com/facebookresearch/segment-anything.git
 pip install wget
-pip install rembg
+pip install rembg # the version of rembg in 2023 worked out, current version failed 
