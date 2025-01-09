@@ -55,7 +55,9 @@ def _expand2square(pil_img, background_color):
 @dataclass
 class SegmentOutput:
     image:Image
-    mask:np.ndarray
+    mask_array:np.ndarray
+    mask_image:Image
+    mask_reverse_image:Image
     origin_size:tuple # the segment image might be expand and resized
 
 def segment(predictor, input_image, segment=True, square_output=True, size:tuple=None, return_dict=False):
@@ -86,7 +88,12 @@ def segment(predictor, input_image, segment=True, square_output=True, size:tuple
         input_image = input_image.resize(size, Image.Resampling.LANCZOS)
     
     if return_dict:
-        return SegmentOutput(image=input_image, mask=mask, origin_size=origin_size)
+        mask_image = np.stack([mask] * 3, axis=2)
+        mask_reverse_image = 255 - mask_image
+        mask_image = Image.fromarray(mask_image, mode='RGB')
+        mask_reverse_image = Image.fromarray(mask_reverse_image, mode='RGB')
+        return SegmentOutput(image=input_image, mask_array=mask, mask_image=mask_image, 
+                             mask_reverse_image=mask_reverse_image, origin_size=origin_size)
     else:
         return input_image
 
