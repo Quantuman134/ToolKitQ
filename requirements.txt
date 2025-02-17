@@ -1,0 +1,7 @@
+matplotlib
+diffusers[torch]
+transformers
+wget
+rembg
+
+git+https://github.com/facebookresearch/segment-anything.git
