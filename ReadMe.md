@@ -13,3 +13,16 @@ segment input image with opaque background, based on SAM
 ## Usage
 (Environment information is in the Env_CMD file temporarily)
 Just clone it and put the folder in the workspace
+
+## Install (Experimental)
+create virtual environment
+```
+conda create -n ToolKitQ python=3.8
+conda activate ToolKitQ
+```
+
+install packages
+```
+cd ToolKitQ
+bash install.sh
+```
