@@ -1,7 +1,8 @@
 matplotlib
-diffusers[torch]
-transformers
+diffusers[torch]==0.32.2
+transformers==4.48.3
 wget
-rembg
+opencv-python==4.11.0.86
+rembg==2.0.52
 
 git+https://github.com/facebookresearch/segment-anything.git
