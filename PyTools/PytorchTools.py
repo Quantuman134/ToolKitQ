@@ -1,10 +1,13 @@
+from typing import Union
+import os
+import random
+
 import torch
 from torchvision import transforms
+import PIL
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-import random
-import os
 
 def torch_device_config(index:int=0) -> torch.device:
     if torch.cuda.is_available():
@@ -40,3 +43,31 @@ def seed_everything(seed=0):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
+
+def img_type_convert(img:Union[torch.Tensor, PIL.Image.Image], target_type='', dtype=None, device=None):
+    '''
+    target_type == ['pt']
+    
+    Support:
+    Image.Image --> torch.Tensor    RGB or RGBA --> [N, C, H, W]  range [0, 1]
+    '''
+    
+    flag_correct_input_type = True
+    flag_coorect_target_type = True
+    
+    if type(img) == PIL.Image.Image:
+        if target_type == 'pt':
+            if dtype is None:
+                dtype = torch.float32
+            if device is None:
+                device = 'cpu'
+            output = transforms.ToTensor()(img).unsqueeze(0).type(dtype).to(device)
+        else:
+            flag_coorect_target_type = False
+    else:
+        flag_correct_input_type = False    
+    
+    assert flag_correct_input_type, f'input type {type(img)} is not supported'
+    assert flag_coorect_target_type, f'target type {target_type} is not supported'
+    
+    return output
