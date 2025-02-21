@@ -17,7 +17,7 @@ Just clone it and put the folder in the workspace
 ## Install (Experimental)
 create virtual environment
 ```
-conda create -n ToolKitQ python=3.8
+conda create -n ToolKitQ python=3.9
 conda activate ToolKitQ
 ```
 
