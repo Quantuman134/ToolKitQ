@@ -44,30 +44,30 @@ def seed_everything(seed=0):
     torch.cuda.manual_seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-def img_type_convert(img:Union[torch.Tensor, PIL.Image.Image], target_type='', dtype=None, device=None):
-    '''
-    target_type == ['pt']
-    
+def img_type_convert(img:Union[np.ndarray, PIL.Image.Image], dtype=None, device=None):
+    '''    
     Support:
-    Image.Image --> torch.Tensor    RGB or RGBA --> [N, C, H, W]  range [0, 1]
+    Image.Image --> torch.Tensor    RGB or RGBA --> [1, C, H, W]  range: [0, 1]
+    np.ndarray --> torch.Tensor    [H, W, C] --> [1, C, H, W]  range: same with input
     '''
     
     flag_correct_input_type = True
-    flag_coorect_target_type = True
     
     if type(img) == PIL.Image.Image:
-        if target_type == 'pt':
-            if dtype is None:
-                dtype = torch.float32
-            if device is None:
-                device = 'cpu'
-            output = transforms.ToTensor()(img).unsqueeze(0).type(dtype).to(device)
-        else:
-            flag_coorect_target_type = False
+        if dtype is None:
+            dtype = torch.float32
+        if device is None:
+            device = 'cpu'
+        output = transforms.ToTensor()(img).unsqueeze(0).type(dtype).to(device)
+    elif type(img) == np.ndarray:
+        if dtype is None:
+            dtype = torch.float32
+        if device is None:
+            device = 'cpu'
+        output = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).type(dtype).to(device)
     else:
         flag_correct_input_type = False    
     
     assert flag_correct_input_type, f'input type {type(img)} is not supported'
-    assert flag_coorect_target_type, f'target type {target_type} is not supported'
     
     return output
