@@ -50,7 +50,6 @@ class StableDiffusionInpaintPipeline(StableDiffusionPipeline):
 
         for timestep in self.scheduler.timesteps:
             latent = self.latent_denoise_step(latent, mask, masked_img_latent, text_embeddings, timestep, guidance_scale=guidance_scale)
-            image = self.latent_decoding(latent)
 
         image = self.latent_decoding(latent)
         return image
