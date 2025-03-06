@@ -18,25 +18,26 @@ def sam_init(device='cpu'):
     predictor = SamPredictor(sam)
     return predictor
 
-def _sam_segment(predictor, input_image, *bbox_coords):
-    bbox = np.array(bbox_coords)
+def _sam_segment(predictor, input_image, bbox, point_coords=None, point_labels=None):
     image = np.asarray(input_image)
 
     start_time = time.time()
     predictor.set_image(image)
 
-    masks_bbox, scores_bbox, logits_bbox = predictor.predict(
+    masks, mask_scores, logits_masks = predictor.predict(
         box=bbox,
+        point_coords=point_coords,
+        point_labels=point_labels,
         multimask_output=True
     )
 
     print(f"SAM Time: {time.time() - start_time:.3f}s")
     out_image = np.zeros((image.shape[0], image.shape[1], 4), dtype=np.uint8)
     out_image[:, :, :3] = image
-    out_image_bbox = out_image.copy()
-    out_image_bbox[:, :, 3] = masks_bbox[-1].astype(np.uint8) * 255
+    out_image[:, :, 3] = masks[-1].astype(np.uint8) * 255
     torch.cuda.empty_cache()
-    return Image.fromarray(out_image_bbox, mode='RGBA'), masks_bbox[-1].astype(np.uint8) * 255
+    
+    return Image.fromarray(out_image, mode='RGBA'), masks[-1].astype(np.uint8) * 255
 
 def _expand2square(pil_img, background_color):
     width, height = pil_img.size
@@ -60,11 +61,15 @@ class SegmentOutput:
     mask_reverse_image:Image
     origin_size:tuple # the segment image might be expand and resized
 
-def segment(predictor, input_image, segment=True, square_output=True, size:tuple=None, return_dict=False):
+def segment(predictor, input_image, bbox=None, segment=True, square_output=True, size:tuple=None, return_dict=False):
     '''
+    Arguments:
         input_image: PIL.Image
+        bbox: the bbox of segmented area, A Bx4 array given a box prompt to the model, in XYXY format.
+        
+    Output:
+        image: PIL.Image
         mask: mask of input image (H, W), value range int[0, 255]
-        output: PIL.Image with RGBA channel
     '''
     # RES = 1024
     # input_image.thumbnail([RES, RES], Image.Resampling.LANCZOS)
@@ -72,16 +77,37 @@ def segment(predictor, input_image, segment=True, square_output=True, size:tuple
     origin_size = (width, height)
 
     if segment:
-        image_rem = input_image.convert('RGBA')
-        image_nobg = remove(image_rem, alpha_matting=True)
-        arr = np.asarray(image_nobg)[:,:,-1]
-        x_nonzero = np.nonzero(arr.sum(axis=0))
-        y_nonzero = np.nonzero(arr.sum(axis=1))
-        x_min = int(x_nonzero[0].min())
-        y_min = int(y_nonzero[0].min())
-        x_max = int(x_nonzero[0].max())
-        y_max = int(y_nonzero[0].max())
-        input_image, mask = _sam_segment(predictor, input_image.convert('RGB'), x_min, y_min, x_max, y_max)
+        if bbox is None:
+            image_rem = input_image.convert('RGBA')
+            image_nobg = remove(image_rem, alpha_matting=True)
+            arr = np.asarray(image_nobg)[:,:,-1]
+            x_nonzero = np.nonzero(arr.sum(axis=0))
+            y_nonzero = np.nonzero(arr.sum(axis=1))
+            x_min = int(x_nonzero[0].min())
+            y_min = int(y_nonzero[0].min())
+            x_max = int(x_nonzero[0].max())
+            y_max = int(y_nonzero[0].max())
+            
+            bbox = np.array([x_min, y_min, x_max, y_max])
+            point_coords = None
+            point_labels = None
+        else:
+            image_rem = input_image.crop((bbox[0], bbox[1], bbox[2], bbox[3])).convert('RGBA')
+            image_nobg = remove(image_rem, alpha_matting=True)
+            arr = np.asarray(image_nobg)[:,:,-1]
+            x_nonzero = np.nonzero(arr.sum(axis=0))
+            y_nonzero = np.nonzero(arr.sum(axis=1))
+            x_min = int(x_nonzero[0].min())
+            y_min = int(y_nonzero[0].min())
+            x_max = int(x_nonzero[0].max())
+            y_max = int(y_nonzero[0].max())
+            bbox = np.array([x_min + bbox[0], y_min + bbox[1], x_max + bbox[0], y_max + bbox[1]])
+            
+            point_coords = np.array([[int((bbox[0] + bbox[2]) / 2),  int((bbox[1] + bbox[3]) / 2)]])
+            point_labels = np.array([1])
+            
+        input_image, mask = _sam_segment(predictor, input_image.convert('RGB'), bbox, point_coords, point_labels)
+    
     if square_output:
         input_image = _expand2square(input_image, (127, 127, 127, 0))
     if size is not None:
@@ -95,7 +121,8 @@ def segment(predictor, input_image, segment=True, square_output=True, size:tuple
         return SegmentOutput(image=input_image, mask_array=mask, mask_image=mask_image, 
                              mask_reverse_image=mask_reverse_image, origin_size=origin_size)
     else:
-        return input_image
+        image = input_image
+        return image
 
 if __name__ == '__main__':
     from ToolKitQ.PyTools.PytorchTools import torch_device_config
@@ -103,5 +130,7 @@ if __name__ == '__main__':
     device = torch_device_config()
     predictor = sam_init(device)
     image = Image.open("./ToolKitQ/ImgTools/sample/dog.jpg")
-    image_after = segment(predictor, image, size=(320, 320))
-    image_after.save("./ToolKitQ/ImgTools/sample/seg.png")
+    image_after = segment(predictor, image, size=(320, 320)) # segment without bbox
+    image_after_2 = segment(predictor, image, bbox=np.array([100, 50, 681, 450]), size=(320, 320)) # segment with bbox
+    image_after.save("./ToolKitQ/ImgTools/sample/seg_wo_bbox.png")
+    image_after_2.save("./ToolKitQ/ImgTools/sample/seg_w_bbox.png")
